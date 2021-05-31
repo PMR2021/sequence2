@@ -3,33 +3,53 @@ package com.ec.sequence2.data
 import com.ec.sequence2.data.model.Post
 import com.ec.sequence2.data.model.PostsResponse
 import com.google.gson.Gson
+import kotlinx.coroutines.*
 import java.io.BufferedReader
-import java.lang.Exception
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.Executors
 
 object DataProvider {
 
-    private val BACKGOURND = Executors.newFixedThreadPool(2)
 
     private val POST_API_URL =
         "https://api.producthunt.com/v1/posts?access_token=46a03e1c32ea881c8afb39e59aa17c936ff4205a8ed418f525294b2b45b56abb"
 
     private val gson = Gson()
-    fun getPostFromApi(onSuccess: (List<Post>) -> Unit, onError: (Throwable) -> Unit) {
-        BACKGOURND.submit {
-            try {
-                val postRaw = makeCall().orEmpty()
-                val postsResponse = gson.fromJson(postRaw, PostsResponse::class.java)
-                onSuccess(postsResponse.posts)
-            } catch (e: Exception) {
-                onError(e)
-            }
-        }
+
+
+    suspend fun getPostFromApi(): List<Post> {
+        val postRaw1 = makeCall().orEmpty()
+        val postRaw2 = makeCall().orEmpty()
+        val postsResponse1 = serialize(postRaw1)
+        val postsResponse2 = serialize(postRaw2)
+
+       return postsResponse1.posts + postsResponse2.posts
     }
 
-    private fun makeCall(): String? {
+    private suspend fun serialize(postRaw : String) = withContext(Dispatchers.Default) {
+        gson.fromJson(postRaw, PostsResponse::class.java)
+    }
+
+    suspend fun getPostFromApiAsync(): List<Post> = supervisorScope {
+        val postRaw1Deferred = async {
+            makeCall().orEmpty()
+        }
+        val postRaw2Deferred = async {
+            makeCall().orEmpty()
+        }
+        val postsResponse1Deferred = async {
+            serialize(postRaw1Deferred.await())
+        }
+
+        val postsResponse2Deferred = async {
+            serialize(postRaw2Deferred.await())
+        }
+
+        postsResponse1Deferred.await().posts + postsResponse2Deferred.await().posts
+    }
+
+
+    private suspend fun makeCall(): String? =  withContext(Dispatchers.IO) {
         var urlConnection: HttpURLConnection? = null
         var reader: BufferedReader? = null
         try {
@@ -38,7 +58,8 @@ object DataProvider {
             urlConnection.connect()
 
             reader = urlConnection.inputStream?.bufferedReader()
-            return reader?.readText()
+
+            reader?.readText()
 
         } finally {
             urlConnection?.disconnect()

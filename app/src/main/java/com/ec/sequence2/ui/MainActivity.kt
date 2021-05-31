@@ -11,9 +11,16 @@ import com.ec.sequence2.data.model.Post
 import com.ec.sequence2.R
 import com.ec.sequence2.data.DataProvider
 import com.ec.sequence2.ui.adapter.PostAdapter
+import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
+    private val activityScope = CoroutineScope(
+        SupervisorJob() +
+        Dispatchers.Main
+    )
+    var job : Job? = null
     private lateinit var postAdapter: PostAdapter
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -21,21 +28,42 @@ class MainActivity : AppCompatActivity() {
         loadAndDisplayPosts()
     }
 
-    private fun loadAndDisplayPosts() {
-        showProgress(true)
-        DataProvider.getPostFromApi(
-            onSuccess = { posts ->
-                runOnUiThread {
-                    postAdapter.show(posts)
-                    showProgress(false)
-                }
-            },
-            onError = {
-                showProgress(false)
-                Toast.makeText(this@MainActivity, "Error", Toast.LENGTH_SHORT).show()
-            }
-        )
+    private fun refersh() {
+        job?.cancel()
+        job = activityScope.launch {
+            showProgress(true)
+            try {
+                val posts = DataProvider.getPostFromApi()
 
+                postAdapter.show(posts)
+
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "${e.message} ", Toast.LENGTH_SHORT).show()
+            }
+            showProgress(false)
+        }
+    }
+
+    private fun loadAndDisplayPosts() {
+
+      activityScope.launch {
+            showProgress(true)
+            try {
+                val posts = DataProvider.getPostFromApi()
+                postAdapter.show(posts)
+
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "${e.message} ", Toast.LENGTH_SHORT).show()
+            }
+            showProgress(false)
+        }
+
+
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        activityScope.cancel()
     }
 
     private fun showProgress(show: Boolean) {
