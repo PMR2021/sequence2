@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.ec.sequence2.data.model.Post
 import com.ec.sequence2.R
+import com.squareup.picasso.Picasso
 
 class PostAdapter(
     private val actionListener: ActionListener? = null
@@ -60,7 +61,8 @@ class PostAdapter(
         fun bind(post: Post, actionListener: ActionListener?) {
             titleTextView.text = post.title
             subTitleTextView.text = post.subTitle
-            image.setImageResource(R.drawable.image1)
+            Picasso.get().load(post.thumbnail.imageUrl).into(image)
+
             itemView.setOnClickListener {
                 actionListener?.onItemClicked(post)
                 Log.d("PostViewHolder", "Clicked! ${post.title}")
